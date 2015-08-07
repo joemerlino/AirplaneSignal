@@ -1,0 +1,9 @@
+Package: com.joemerlino.airplanesignal
+Name: AirplaneSignal
+Depends: mobilesubstrate, firmware (>= 7.0), com.a3tweaks.flipswitch (>= 1.0.3)
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: Turns on AirplaneMode if the signal strength is below 20% - 40% or 60%. Concept by Umar Usman @UmarUxmn.
+Maintainer: Joe Merlino
+Author: Joe Merlino
+Section: Tweaks

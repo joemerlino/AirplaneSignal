@@ -1,0 +1,10 @@
+{
+    entry = {
+	bundle = AirplaneSignalPrefs;
+	cell = PSLinkCell;
+	detail = AirplaneSignalPrefsListController;
+	icon = AirplaneSignalPrefs.png;
+	isController = 1;
+	label = AirplaneSignal;
+    };
+}
