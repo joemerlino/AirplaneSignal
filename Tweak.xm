@@ -24,8 +24,7 @@ static int percentage = AS_DEFAULT_PERCENTAGE;
 static BOOL enabled = AS_DEFAULT_ENABLED;
 static int bars = 0;
 static int lastTriggerBars = INT_MAX;
-static cancel_block_t cancelAirplaneBlock = NULL;
-static cancel_block_t cancelDowngradeBlock = NULL;
+static cancel_block_t cancelBlock = NULL;
 static BOOL wifi = NO;
 static BOOL bluetooth = NO;
 static int delay = AS_DEFAULT_DELAY;
@@ -75,9 +74,11 @@ static BOOL setNetworkSpeed(ASNetworkSpeed speed) {
 		}
 		if(changed){
 			disableNetworkChange = YES;
+			//15 seconds, so it has time to switch to other Network (In that period iOS always returns only 1 bar)
 			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
 				disabledWhileNetworkChange = NO;
 			});
+			//dont get in a loop of nonstop down an upgrading, wait for some time
 			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, checkmin * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
 				disableNetworkChange = NO;
 			});
@@ -92,29 +93,19 @@ static void handleSignalStrengthUpdate(){
 	NSLog(@"[AirplaneSignal] P: %d BARS: %d CALL: %d", percentage, bars, call);
 	if(enabled && !disabledWhileNetworkChange){
 		if(percentage>=bars){
-			if(tryDownGradeNetworkSpeed && !disableNetworkChange && !didDowngradeNetworkSpeed) {
-				if(!cancelDowngradeBlock && ([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.lte"] == FSSwitchStateOn || [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.3g"] == FSSwitchStateOn)) {
-					NSLog(@"[AirplaneSignal] queueing downgrade block");
-					cancelDowngradeBlock = create_and_run_cancelable_dispatch_after_block(dispatch_time(DISPATCH_TIME_NOW, delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-						NSLog(@"[AirplaneSignal] executing queued downgrade block");
-						didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedSlow);
-						NSLog(@"[AirplaneSignal] Could downgrade network speed: %d", didDowngradeNetworkSpeed);
-						if(didDowngradeNetworkSpeed) {
-							AudioServicesPlaySystemSound(1352);
-						}
-						[cancelDowngradeBlock release];
-						cancelDowngradeBlock = NULL;
-					});
-				}
-				goto returnLabel;
-			}
 			if(lastTriggerBars>=bars){
-				if(!cancelAirplaneBlock){
-					NSLog(@"[AirplaneSignal] queueing airplane block");
-					cancelAirplaneBlock = create_and_run_cancelable_dispatch_after_block(dispatch_time(DISPATCH_TIME_NOW, delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-						NSLog(@"[AirplaneSignal] executing queued airplane block");
+				if(!cancelBlock){
+					NSLog(@"[AirplaneSignal] queueing block");
+					cancelBlock = create_and_run_cancelable_dispatch_after_block(dispatch_time(DISPATCH_TIME_NOW, delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+						NSLog(@"[AirplaneSignal] executing queued block");
 						NSLog(@"[AirplaneSignal] P: %d BARS: %d CALL: %d", percentage, bars, call);
-						if(!call){
+						if(tryDownGradeNetworkSpeed && !disableNetworkChange && !didDowngradeNetworkSpeed) {
+							didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedSlow);
+							NSLog(@"[AirplaneSignal] Could downgrade network speed: %d", didDowngradeNetworkSpeed);
+							if(didDowngradeNetworkSpeed) {
+								AudioServicesPlaySystemSound(1352);
+							}
+						} else if(!call){
 							BOOL tryToRestoreNetworkSpeed = didDowngradeNetworkSpeed;
 							if(percentage>=bars && [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"] == 0){
 								wifi = [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.wifi"] == FSSwitchStateOn;
@@ -131,38 +122,31 @@ static void handleSignalStrengthUpdate(){
 									dispatch_after(dispatch_time(DISPATCH_TIME_NOW, checkmin * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
 										if([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"] == FSSwitchStateOn)
 											[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOff forSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"];
-										if(tryToRestoreNetworkSpeedBlock){
+										if(tryToRestoreNetworkSpeedBlock && !disableNetworkChange){
 											didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedFast);
 										}
 									});
 								}
 								tryToRestoreNetworkSpeed = NO;
 							}
-							if(tryToRestoreNetworkSpeed){
+							if(tryToRestoreNetworkSpeed && !disableNetworkChange){
 								didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedFast);
 							}
 						}
-						[cancelAirplaneBlock release];
-						cancelAirplaneBlock = NULL;
+						[cancelBlock release];
+						cancelBlock = NULL;
 					});
 				}
 				goto returnLabel;
 			}
 		}
-		if(cancelDowngradeBlock) {
+		if(cancelBlock) {
 			//Signal strength got better
-			NSLog(@"[AirplaneSignal] cancel queued downgrade block");
-			cancelDowngradeBlock();
-			[cancelDowngradeBlock release];
-			cancelDowngradeBlock = NULL;
-		}
-		if(cancelAirplaneBlock) {
-			//Signal strength got better
-			NSLog(@"[AirplaneSignal] cancel queued airplane block");
-			cancelAirplaneBlock();
-			[cancelAirplaneBlock release];
-			cancelAirplaneBlock = NULL;
-			if(didDowngradeNetworkSpeed) {
+			NSLog(@"[AirplaneSignal] cancel queued block");
+			cancelBlock();
+			[cancelBlock release];
+			cancelBlock = NULL;
+			if(didDowngradeNetworkSpeed && !disableNetworkChange) {
 				didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedFast);
 			}
 		}
