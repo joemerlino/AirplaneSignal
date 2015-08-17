@@ -99,38 +99,41 @@ static void handleSignalStrengthUpdate(){
 					cancelBlock = create_and_run_cancelable_dispatch_after_block(dispatch_time(DISPATCH_TIME_NOW, delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
 						NSLog(@"[AirplaneSignal] executing queued block");
 						NSLog(@"[AirplaneSignal] P: %d BARS: %d CALL: %d", percentage, bars, call);
-						if(tryDownGradeNetworkSpeed && !disableNetworkChange && !didDowngradeNetworkSpeed) {
-							didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedSlow);
-							NSLog(@"[AirplaneSignal] Could downgrade network speed: %d", didDowngradeNetworkSpeed);
-							if(didDowngradeNetworkSpeed) {
-								AudioServicesPlaySystemSound(1352);
-							}
-						} else if(!call){
-							BOOL tryToRestoreNetworkSpeed = didDowngradeNetworkSpeed;
-							if(percentage>=bars && [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"] == 0){
-								wifi = [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.wifi"] == FSSwitchStateOn;
-							    bluetooth = [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.bluetooth"] == FSSwitchStateOn;
-								[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOn forSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"];
-								AudioServicesPlaySystemSound(1352);
-								NSLog(@"[AirplaneSignal] AIRPLANEMODE ON, WIFI %d, BT %d",wifi, bluetooth); 
-								if(wifi || forcewifi)
-									[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOn forSwitchIdentifier:@"com.a3tweaks.switch.wifi"];
-								if(bluetooth)
-									[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOn forSwitchIdentifier:@"com.a3tweaks.switch.bluetooth"];
-								if(check){
-									BOOL tryToRestoreNetworkSpeedBlock = tryToRestoreNetworkSpeed;
-									dispatch_after(dispatch_time(DISPATCH_TIME_NOW, checkmin * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-										if([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"] == FSSwitchStateOn)
-											[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOff forSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"];
-										if(tryToRestoreNetworkSpeedBlock && !disableNetworkChange){
-											didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedFast);
-										}
-									});
+						//recheck bars nevertheless
+						if(percentage>=bars) {
+							if(tryDownGradeNetworkSpeed && !disableNetworkChange && !didDowngradeNetworkSpeed) {
+								didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedSlow);
+								NSLog(@"[AirplaneSignal] Could downgrade network speed: %d", didDowngradeNetworkSpeed);
+								if(didDowngradeNetworkSpeed) {
+									AudioServicesPlaySystemSound(1352);
 								}
-								tryToRestoreNetworkSpeed = NO;
-							}
-							if(tryToRestoreNetworkSpeed && !disableNetworkChange){
-								didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedFast);
+							} else if(!call){
+								BOOL tryToRestoreNetworkSpeed = didDowngradeNetworkSpeed;
+								if([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"] == 0){
+									wifi = [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.wifi"] == FSSwitchStateOn;
+								    bluetooth = [[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.bluetooth"] == FSSwitchStateOn;
+									[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOn forSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"];
+									AudioServicesPlaySystemSound(1352);
+									NSLog(@"[AirplaneSignal] AIRPLANEMODE ON, WIFI %d, BT %d",wifi, bluetooth); 
+									if(wifi || forcewifi)
+										[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOn forSwitchIdentifier:@"com.a3tweaks.switch.wifi"];
+									if(bluetooth)
+										[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOn forSwitchIdentifier:@"com.a3tweaks.switch.bluetooth"];
+									if(check){
+										BOOL tryToRestoreNetworkSpeedBlock = tryToRestoreNetworkSpeed;
+										dispatch_after(dispatch_time(DISPATCH_TIME_NOW, checkmin * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+											if([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"] == FSSwitchStateOn)
+												[[FSSwitchPanel sharedPanel] setState:FSSwitchStateOff forSwitchIdentifier:@"com.a3tweaks.switch.airplane-mode"];
+											if(tryToRestoreNetworkSpeedBlock && !disableNetworkChange){
+												didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedFast);
+											}
+										});
+									}
+									tryToRestoreNetworkSpeed = NO;
+								}
+								if(tryToRestoreNetworkSpeed && !disableNetworkChange){
+									didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedFast);
+								}
 							}
 						}
 						[cancelBlock release];
