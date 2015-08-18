@@ -55,6 +55,10 @@ cancel_block_t create_and_run_cancelable_dispatch_after_block(dispatch_time_t wh
 	return [cancel_block retain];
 }
 
+static BOOL canDowngradeNetworkSpeed() {
+	return ([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.lte"] == FSSwitchStateOn) || ([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.3g"] == FSSwitchStateOn);
+}
+
 static BOOL setNetworkSpeed(ASNetworkSpeed speed) {
 	BOOL changed = NO;
 	disabledWhileNetworkChange = YES;
@@ -101,7 +105,7 @@ static void handleSignalStrengthUpdate(){
 						NSLog(@"[AirplaneSignal] P: %d BARS: %d CALL: %d", percentage, bars, call);
 						//recheck bars nevertheless
 						if(percentage>=bars) {
-							if(tryDownGradeNetworkSpeed && !disableNetworkChange && !didDowngradeNetworkSpeed) {
+							if(tryDownGradeNetworkSpeed && !disableNetworkChange && !didDowngradeNetworkSpeed && canDowngradeNetworkSpeed()) {
 								didDowngradeNetworkSpeed = setNetworkSpeed(ASNetworkSpeedSlow);
 								NSLog(@"[AirplaneSignal] Could downgrade network speed: %d", didDowngradeNetworkSpeed);
 								if(didDowngradeNetworkSpeed) {
