@@ -9,6 +9,8 @@
 #define AS_DEFAULT_FORCE_WIFI NO
 #define AS_DEFAULT_DOWNGRADE_NETWORK NO
 #define AS_SETTINGS_DOMAIN CFSTR("com.joemerlino.airplanesignal")
+#define AS_3G_SWITCH_ID "com.a3tweaks.switch.3g"
+#define AS_LTE_SWITCH_ID "com.a3tweaks.switch.lte"
 #ifndef kCFCoreFoundationVersionNumber_iOS_8_0
 	#define kCFCoreFoundationVersionNumber_iOS_8_0 1129.15
 #endif
@@ -36,6 +38,46 @@ static BOOL didDowngradeNetworkSpeed = NO;
 static BOOL disabledWhileNetworkChange = NO;
 static BOOL disableNetworkChange = NO;
 
+@interface ASFlipSwitchNotificationHelper : NSObject
++ (void)startListeningForNotifications;
+@end
+
+@implementation ASFlipSwitchNotificationHelper 
+
++ (void)startListeningForNotifications {
+	static dispatch_once_t onceToken;
+	static ASFlipSwitchNotificationHelper* instance;
+    dispatch_once(&onceToken, ^{
+        instance = [[self alloc] init];
+    });
+}
+
+- (instancetype)init {
+	if((self = [super init])){
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(flipSwitchChanged:) name:FSSwitchPanelSwitchStateChangedNotification object:nil];
+	}
+	return self;
+}
+
+- (void)flipSwitchChanged:(NSNotification *)notification {
+	NSString* switchID = [[[notification userInfo] valueForKey:FSSwitchPanelSwitchIdentifierKey] retain];
+	if(switchID != nil && ([@AS_3G_SWITCH_ID isEqualToString:switchID] || [@AS_LTE_SWITCH_ID isEqualToString:switchID])) {
+		if(!disabledWhileNetworkChange && didDowngradeNetworkSpeed && canDowngradeNetworkSpeed()){
+			//user enabled 3G/LTE after we disabled it.
+			NSLog(@"[AirplaneSignal] user did enable 3G/LTE after we disabled!");
+			didDowngradeNetworkSpeed = NO;
+		}
+	}
+	[switchID release];
+}
+
+- (void)dealloc {
+	[[NSNotificationCenter defaultCenter] removeObserver:self name:FSSwitchPanelSwitchStateChangedNotification object:nil];
+	[super dealloc];
+}
+
+@end
+
 cancel_block_t create_and_run_cancelable_dispatch_after_block(dispatch_time_t when, dispatch_queue_t queue, dispatch_block_t block) {
 	if(!block) {
 		return NULL;
@@ -56,7 +98,7 @@ cancel_block_t create_and_run_cancelable_dispatch_after_block(dispatch_time_t wh
 }
 
 static BOOL canDowngradeNetworkSpeed() {
-	return ([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.lte"] == FSSwitchStateOn) || ([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.3g"] == FSSwitchStateOn);
+	return ([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@AS_LTE_SWITCH_ID] == FSSwitchStateOn) || ([[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@AS_3G_SWITCH_ID] == FSSwitchStateOn);
 }
 
 static BOOL setNetworkSpeed(ASNetworkSpeed speed) {
@@ -67,19 +109,19 @@ static BOOL setNetworkSpeed(ASNetworkSpeed speed) {
 			NSLog(@"[AirplaneSignal] Try to upgrade network speed.");
 		}
 		//new Phones with LTE
-		if ((![[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.lte"]) == speed) {
-			[[FSSwitchPanel sharedPanel] setState:(FSSwitchState)speed forSwitchIdentifier:@"com.a3tweaks.switch.lte"];
+		if ((![[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@AS_LTE_SWITCH_ID]) == speed) {
+			[[FSSwitchPanel sharedPanel] setState:(FSSwitchState)speed forSwitchIdentifier:@AS_LTE_SWITCH_ID];
 			changed = YES;
 		}
 		//old Phones without LTE
-		if ((![[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@"com.a3tweaks.switch.3g"]) == speed) {
-			[[FSSwitchPanel sharedPanel] setState:(FSSwitchState)speed forSwitchIdentifier:@"com.a3tweaks.switch.3g"];
+		if ((![[FSSwitchPanel sharedPanel] stateForSwitchIdentifier:@AS_3G_SWITCH_ID]) == speed) {
+			[[FSSwitchPanel sharedPanel] setState:(FSSwitchState)speed forSwitchIdentifier:@AS_3G_SWITCH_ID];
 			changed = YES;
 		}
 		if(changed){
 			disableNetworkChange = YES;
 			//15 seconds, so it has time to switch to other Network (In that period iOS always returns only 1 bar)
-			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
 				disabledWhileNetworkChange = NO;
 			});
 			//dont get in a loop of nonstop down an upgrading, wait for some time
@@ -216,6 +258,7 @@ static void LoadSettings(){
 {
 	CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)LoadSettings, CFSTR("com.joemerlino.airplanesignal.preferencechanged"), NULL, CFNotificationSuspensionBehaviorCoalesce);
 	LoadSettings();
+	[ASFlipSwitchNotificationHelper startListeningForNotifications];
 	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_8_0)
 		%init(OS8Hooks);
 	else
