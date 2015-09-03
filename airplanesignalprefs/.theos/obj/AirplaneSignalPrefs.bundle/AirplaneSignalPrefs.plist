@@ -174,6 +174,26 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
+			<string>This feature allows to "force downgrade" network speed (LTE -> 3G [or 3G -> EDGE on older iDevices]) before enabling airplane mode, since signal strength might be better on slower network.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.joemerlino.airplanesignal</string>
+			<key>key</key>
+			<string>downgradenetwork</string>
+			<key>label</key>
+			<string>Downgrade network speed</string>
+			<key>PostNotification</key>
+			<string>com.joemerlino.airplanesignal.preferencechanged</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
 			<string>Donation and contact email are the same, if you're already logged on PayPal you'll see that directly filled in.</string>
 		</dict>
 		<dict>
